@@ -8,11 +8,13 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall")
 
+# Compile the shaders
+add_subdirectory(shaders)
+
+add_subdirectory(rendering)
+
 # Set up the triangle target
-add_executable(triangle
-    main.cxx 
-    VulkanWindow.cxx VulkanWindow.hxx
-    GraphicsPipeline.cxx GraphicsPipeline.hxx)
+add_executable(triangle main.cxx)
 
 find_package(PkgConfig REQUIRED)
 find_package(GLM REQUIRED)
@@ -25,12 +27,11 @@ target_include_directories(triangle PRIVATE SYSTEM ${Vulkan_INCLUDE_DIRS})
 target_include_directories(triangle PRIVATE SYSTEM ${GLM_INCLUDE_DIRS})
 target_include_directories(triangle PRIVATE SYSTEM ${GLFW_INCLUDE_DIRS})
 target_include_directories(triangle PRIVATE SYSTEM ${Boost_INCLUDE_DIRS})
+target_include_directories(triangle PRIVATE ./rendering/)
 
 target_link_libraries(triangle ${GLFW_LIBRARIES})
 target_link_libraries(triangle Vulkan::Vulkan)
+target_link_libraries(triangle rendering)
 
 add_custom_target(test COMMAND VK_LAYER_PATH=/etc/vulkan/explicit_layer.d ${CMAKE_BINARY_DIR}/triangle)
 add_dependencies(test triangle)
-
-# Compile the shaders
-add_subdirectory(shaders)

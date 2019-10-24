@@ -7,7 +7,7 @@ extern "C" {
 #include <stdexcept>
 #include <cstdlib>
 
-#include "VulkanWindow.hxx"
+#include <VulkanWindow.hxx>
 
 int main() {
     VulkanWindow *vkWindow = new VulkanWindow(800, 600, "Vulkan Window");

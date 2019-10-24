@@ -11,9 +11,9 @@ extern "C" {
 #include <optional>
 #include <vulkan/vulkan.hpp>
 
+#include "Render.hxx"
 #include "GraphicsPipeline.hxx"
-
-using namespace vk;
+#include "FrameBuffer.hxx"
 
 static const uint32_t DEFAULT_WIDTH = 800;
 static const uint32_t DEFAULT_HEIGHT = 600;
@@ -42,9 +42,9 @@ struct QueueFamilyIndices {
 };
 
 struct SwapChainSupportDetails {
-    SurfaceCapabilitiesKHR capabilites;
-    std::vector<SurfaceFormatKHR> formats;
-    std::vector<PresentModeKHR> presentModes;
+    vk::SurfaceCapabilitiesKHR capabilites;
+    std::vector<vk::SurfaceFormatKHR> formats;
+    std::vector<vk::PresentModeKHR> presentModes;
 };
 
 class VulkanWindow {
@@ -60,28 +60,30 @@ private:
     uint32_t m_height;
     std::string m_title;
 
-    Instance m_instance;
-    SurfaceKHR m_surface;
+    vk::Instance m_instance;
+    vk::SurfaceKHR m_surface;
 
     // Devices
-    PhysicalDevice m_device = nullptr;
-    Device m_logicalDevice;
+    vk::PhysicalDevice m_device = nullptr;
+    vk::Device m_logicalDevice;
 
     // Queues
-    Queue m_graphicsQueue;
-    Queue m_presentQueue;
+    vk::Queue m_graphicsQueue;
+    vk::Queue m_presentQueue;
 
     // Swap chain
-    SwapchainKHR m_swapChain;
-    std::vector<Image> m_swapChainImages;
-    Format m_swapChainImageFormat;
-    Extent2D m_swapChainExtent;
+    vk::SwapchainKHR m_swapChain;
+    std::vector<vk::Image> m_swapChainImages;
+    vk::Format m_swapChainImageFormat;
+    vk::Extent2D m_swapChainExtent;
 
     // Graphics
     GraphicsPipeline *m_gPipeline;
+    Render *m_render;
+    std::vector<FrameBuffer*> m_frameBuffers;
 
     // Image views
-    std::vector<ImageView> m_swapChainImageViews;
+    std::vector<vk::ImageView> m_swapChainImageViews;
 
 
     // -----Instance management methods-----
@@ -110,6 +112,8 @@ private:
 
     void createImageViews();
 
+    void createFrameBuffers();
+
     /**
      * Checks if the required validation layers are present on the machine.
      * 
@@ -124,7 +128,7 @@ private:
      * @param printResults If set to "true", the method will print the list of available extensions to the standard log.
      * @return a vector containing the Vulkan extensions supported by the host machine.
      */
-    std::vector<ExtensionProperties> getSupportedExtensions(bool printResults);
+    std::vector<vk::ExtensionProperties> getSupportedExtensions(bool printResults);
 
     /**
      *  Queries the Vulkan API to confirm that the extensions required by the application are available.
@@ -132,7 +136,7 @@ private:
      * @param device physical device to check
      * @return true if all required extensions are supported.
      */
-    bool checkDeviceExtensionSupport(PhysicalDevice device);
+    bool checkDeviceExtensionSupport(vk::PhysicalDevice device);
 
     /**
      * Queries the Vulkan API for a list of graphics-capable devices on the host machine and selects the most appropriate one.
@@ -145,7 +149,7 @@ private:
      * @param device physical device to check
      * @return true if the device is suitable
      */
-    bool isDeviceSuitable(PhysicalDevice device);
+    bool isDeviceSuitable(vk::PhysicalDevice device);
 
     /**
      * Determines which queue families are supported by the selected device.
@@ -153,7 +157,7 @@ private:
      * @param device physical device to check
      * @return a struct containing the indices of the queue families
      */
-    QueueFamilyIndices findQueueFamilies(PhysicalDevice device);
+    QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device);
 
     /**
      * Creates a logical Vulkan device to relay commands to the GPU.
@@ -171,13 +175,13 @@ private:
      * @param device physical device to check
      * @return a SwapChainSupportDetails struct
      */
-    SwapChainSupportDetails querySwapChainSupport(PhysicalDevice device);
+    SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device);
 
-    SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<SurfaceFormatKHR>& availableFormats);
+    vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
 
-    PresentModeKHR chooseSwapPresentMode(const std::vector<PresentModeKHR>& availablePresentModes);
+    vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
 
-    Extent2D chooseSwapExtent(const SurfaceCapabilitiesKHR capabilites);
+    vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilites);
 };
 
 #endif // VULKAN_WINDOW_HXX

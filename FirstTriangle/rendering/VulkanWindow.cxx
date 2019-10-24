@@ -34,8 +34,14 @@ VulkanWindow::VulkanWindow(const uint32_t width, const uint32_t height, const st
 };
 
 VulkanWindow::~VulkanWindow() {
+    // Destroy the FrameBuffers
+    for (auto buffer : m_frameBuffers) {
+        delete buffer;
+    }
+
     // Destroy the graphics pipeline
     delete m_gPipeline;
+    delete m_render;
 
     // Destroy our image views
     for (auto imageView : m_swapChainImageViews) {
@@ -74,7 +80,11 @@ void VulkanWindow::initVulkan() {
     pickPhysicalDevice();
     createLogicalDevice();
     createSwapChain();
-    m_gPipeline = new GraphicsPipeline(&m_logicalDevice, &m_swapChainExtent);
+    createImageViews();
+    m_render = new Render(&m_logicalDevice, m_swapChainImageFormat);
+    m_gPipeline = new GraphicsPipeline(&m_logicalDevice, &m_swapChainExtent, m_render->renderPass());
+    createFrameBuffers();
+git     std::cout << "I'm just curious..." << std::endl;
 }
 
 // ----- Vulkan-specific methods -----
@@ -84,11 +94,11 @@ void VulkanWindow::createVkInstance() {
         throw std::runtime_error("Validation layers requested, but not available!");
     }
 
-    ApplicationInfo info("Vulkan Triangle", VK_MAKE_VERSION(1, 0, 0),
+    vk::ApplicationInfo info("Vulkan Triangle", VK_MAKE_VERSION(1, 0, 0),
         "No Engine", VK_MAKE_VERSION(1, 0, 0), VK_API_VERSION_1_1);
 
 
-    InstanceCreateInfo create({}, &info);
+    vk::InstanceCreateInfo create({}, &info);
 
     if (ENABLE_VALIDATION_LAYERS) {
         create.enabledLayerCount = static_cast<uint32_t>(VALIDATION_LAYERS.size());
@@ -106,13 +116,12 @@ void VulkanWindow::createVkInstance() {
     create.enabledExtensionCount = glfwExtCount;
     create.ppEnabledExtensionNames = glfwExtensions;
     
-    Result result = createInstance(&create, nullptr, &m_instance);
+    vk::createInstance(&create, nullptr, &m_instance);
 
-    getSupportedExtensions(true);
+    // getSupportedExtensions(true);
 }
 
 void VulkanWindow::createSurface() {
-    // TODO: Figure out how to pass the Vulkan surface to GLFW
     if (glfwCreateWindowSurface(m_instance, m_window, nullptr, (VkSurfaceKHR *) &m_surface) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create window surface.");
     }
@@ -122,15 +131,15 @@ void VulkanWindow::createImageViews() {
     m_swapChainImageViews.resize(m_swapChainImages.size());
 
     for (size_t i = 0; i < m_swapChainImages.size(); i++) {
-            ImageViewCreateInfo createInfo({}, m_swapChainImages[i], 
-            ImageViewType::e2D, m_swapChainImageFormat);
+            vk::ImageViewCreateInfo createInfo({}, m_swapChainImages[i], 
+            vk::ImageViewType::e2D, m_swapChainImageFormat);
 
-        createInfo.components.r = ComponentSwizzle::eIdentity;
-        createInfo.components.g = ComponentSwizzle::eIdentity;
-        createInfo.components.b = ComponentSwizzle::eIdentity;
-        createInfo.components.a = ComponentSwizzle::eIdentity;
+        createInfo.components.r = vk::ComponentSwizzle::eIdentity;
+        createInfo.components.g = vk::ComponentSwizzle::eIdentity;
+        createInfo.components.b = vk::ComponentSwizzle::eIdentity;
+        createInfo.components.a = vk::ComponentSwizzle::eIdentity;
 
-        createInfo.subresourceRange.aspectMask = ImageAspectFlagBits::eColor; 
+        createInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor; 
         createInfo.subresourceRange.baseMipLevel = 0;
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
@@ -144,12 +153,21 @@ void VulkanWindow::createImageViews() {
     }
 }
 
+void VulkanWindow::createFrameBuffers() {
+    m_frameBuffers.resize(m_swapChainImageViews.size());
+    for (size_t i = 0; i < m_swapChainImageViews.size(); i++) {
+        vk::ImageView attachment = m_swapChainImageViews[i];
+
+        m_frameBuffers[i] = new FrameBuffer(&m_logicalDevice, &attachment, m_swapChainExtent, m_render->renderPass());
+    }
+}
+
 bool VulkanWindow::checkValidationLayerSupport() {
     uint32_t layerCount;
-    enumerateInstanceLayerProperties(&layerCount, {}, {});
+    vk::enumerateInstanceLayerProperties(&layerCount, {}, {});
 
-    std::vector<LayerProperties> availableLayers(layerCount);
-    enumerateInstanceLayerProperties(&layerCount, availableLayers.data(), {});
+    std::vector<vk::LayerProperties> availableLayers(layerCount);
+    vk::enumerateInstanceLayerProperties(&layerCount, availableLayers.data(), {});
 
     for (const std::string layerName : VALIDATION_LAYERS) {
         bool layerFound = false;
@@ -169,12 +187,12 @@ bool VulkanWindow::checkValidationLayerSupport() {
     return true;
 }
 
-std::vector<ExtensionProperties> VulkanWindow::getSupportedExtensions(bool printResults) {
+std::vector<vk::ExtensionProperties> VulkanWindow::getSupportedExtensions(bool printResults) {
     uint32_t extCount = 0;
-    enumerateInstanceExtensionProperties({}, &extCount, {}, {});
+    vk::enumerateInstanceExtensionProperties({}, &extCount, {}, {});
 
-    std::vector<ExtensionProperties> extensions(extCount);
-    enumerateInstanceExtensionProperties({}, &extCount, extensions.data(), {});
+    std::vector<vk::ExtensionProperties> extensions(extCount);
+    vk::enumerateInstanceExtensionProperties({}, &extCount, extensions.data(), {});
 
     if (printResults) {
         std::clog << "Available extensions:" << std::endl;
@@ -187,11 +205,11 @@ std::vector<ExtensionProperties> VulkanWindow::getSupportedExtensions(bool print
     return extensions;
 }
 
-bool VulkanWindow::checkDeviceExtensionSupport(PhysicalDevice device) {
+bool VulkanWindow::checkDeviceExtensionSupport(vk::PhysicalDevice device) {
     uint32_t extCount = 0;
     device.enumerateDeviceExtensionProperties({}, &extCount, {}, {});
 
-    std::vector<ExtensionProperties> availableExtensions(extCount);
+    std::vector<vk::ExtensionProperties> availableExtensions(extCount);
     device.enumerateDeviceExtensionProperties({}, &extCount, availableExtensions.data(), {});
 
     std::set<std::string> requiredExts(DEVICE_EXTENSIONS.begin(), DEVICE_EXTENSIONS.end());
@@ -211,7 +229,7 @@ void VulkanWindow::pickPhysicalDevice() {
         throw std::runtime_error("Failed to find any devices with Vulkan support!");
     }
 
-    std::vector<PhysicalDevice> devices(deviceCount);
+    std::vector<vk::PhysicalDevice> devices(deviceCount);
     m_instance.enumeratePhysicalDevices(&deviceCount, devices.data(), {});
 
     for (const auto& device : devices) {
@@ -220,17 +238,13 @@ void VulkanWindow::pickPhysicalDevice() {
             break;
         }
     }
-
-    // if (m_device == nullptr) {
-    //     throw std::runtime_error("Failed to find a suitable device!");
-    // }
 }
 
-bool VulkanWindow::isDeviceSuitable(PhysicalDevice device) {
-    PhysicalDeviceProperties deviceProps;
+bool VulkanWindow::isDeviceSuitable(vk::PhysicalDevice device) {
+    vk::PhysicalDeviceProperties deviceProps;
     deviceProps = device.getProperties();
 
-    PhysicalDeviceFeatures deviceFeatures;
+    vk::PhysicalDeviceFeatures deviceFeatures;
     deviceFeatures = device.getFeatures();
 
     QueueFamilyIndices indices = findQueueFamilies(device);
@@ -246,22 +260,22 @@ bool VulkanWindow::isDeviceSuitable(PhysicalDevice device) {
         && swapChainAdequate;
 }
 
-QueueFamilyIndices VulkanWindow::findQueueFamilies(PhysicalDevice device) {
+QueueFamilyIndices VulkanWindow::findQueueFamilies(vk::PhysicalDevice device) {
     QueueFamilyIndices indices;
 
     uint32_t queueFamilyCount = 0;
     device.getQueueFamilyProperties(&queueFamilyCount, {}, {});
 
-    std::vector<QueueFamilyProperties> queueFamilies(queueFamilyCount);
+    std::vector<vk::QueueFamilyProperties> queueFamilies(queueFamilyCount);
     device.getQueueFamilyProperties(&queueFamilyCount, queueFamilies.data(), {});
 
     uint32_t i = 0;
     for (const auto& family : queueFamilies) {
-        Bool32 presentSupport = false;
+        vk::Bool32 presentSupport = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &presentSupport);
         device.getSurfaceSupportKHR(i, m_surface, &presentSupport, {});
 
-        if (family.queueCount > 0 && family.queueFlags & QueueFlagBits::eGraphics) {
+        if (family.queueCount > 0 && family.queueFlags & vk::QueueFlagBits::eGraphics) {
             indices.graphicsFamily = i;
         }
 
@@ -283,7 +297,7 @@ void VulkanWindow::createLogicalDevice() {
     // Set up queue features
     QueueFamilyIndices indices = findQueueFamilies(m_device);
 
-    std::vector<DeviceQueueCreateInfo> queueCreateInfos;
+    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
         indices.graphicsFamily.value(),
         indices.presentFamily.value()
@@ -291,16 +305,16 @@ void VulkanWindow::createLogicalDevice() {
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
-        DeviceQueueCreateInfo queueCreateInfo({}, queueFamily, 1, &queuePriority);
+        vk::DeviceQueueCreateInfo queueCreateInfo({}, queueFamily, 1, &queuePriority);
 
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
     // Specify device features
-    PhysicalDeviceFeatures deviceFeatures = {};
+    vk::PhysicalDeviceFeatures deviceFeatures = {};
 
     // Create the logical device
-    DeviceCreateInfo createInfo({}, static_cast<uint32_t>(queueCreateInfos.size()),
+    vk::DeviceCreateInfo createInfo({}, static_cast<uint32_t>(queueCreateInfos.size()),
         queueCreateInfos.data());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
@@ -330,9 +344,9 @@ void VulkanWindow::createLogicalDevice() {
 void VulkanWindow::createSwapChain() {
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport(m_device);
 
-    SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-    PresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-    Extent2D extent = chooseSwapExtent(swapChainSupport.capabilites);
+    vk::SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+    vk::PresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+    vk::Extent2D extent = chooseSwapExtent(swapChainSupport.capabilites);
 
     // Determine max number of images to render
     uint32_t imageCount = swapChainSupport.capabilites.minImageCount + 1;
@@ -341,8 +355,8 @@ void VulkanWindow::createSwapChain() {
     }
 
     // Create the swap chain object
-    SwapchainCreateInfoKHR createInfo({}, m_surface, imageCount, surfaceFormat.format,
-        surfaceFormat.colorSpace, extent, 1, ImageUsageFlagBits::eColorAttachment);
+    vk::SwapchainCreateInfoKHR createInfo({}, m_surface, imageCount, surfaceFormat.format,
+        surfaceFormat.colorSpace, extent, 1, vk::ImageUsageFlagBits::eColorAttachment);
 
     QueueFamilyIndices indices = findQueueFamilies(m_device);
     uint32_t queueFamilyIndices[] = {
@@ -351,21 +365,20 @@ void VulkanWindow::createSwapChain() {
     };
 
     if (indices.graphicsFamily != indices.presentFamily) {
-        createInfo.imageSharingMode = SharingMode::eConcurrent;
+        createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
     } else {
-        createInfo.imageSharingMode = SharingMode::eExclusive;
+        createInfo.imageSharingMode = vk::SharingMode::eExclusive;
         createInfo.queueFamilyIndexCount = 0;
         createInfo.pQueueFamilyIndices = {};
     }
 
     createInfo.preTransform = swapChainSupport.capabilites.currentTransform;
-    createInfo.compositeAlpha = CompositeAlphaFlagBitsKHR::eOpaque;
+    createInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
 
     createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;
-    //createInfo.oldSwapchain = nullptr;
+    createInfo.clipped = true;
 
     try {
         m_logicalDevice.createSwapchainKHR(&createInfo, {}, &m_swapChain, {});
@@ -383,7 +396,7 @@ void VulkanWindow::createSwapChain() {
     m_swapChainExtent = extent;
 }
 
-SwapChainSupportDetails VulkanWindow::querySwapChainSupport(PhysicalDevice device){
+SwapChainSupportDetails VulkanWindow::querySwapChainSupport(vk::PhysicalDevice device){
     SwapChainSupportDetails details;
     device.getSurfaceCapabilitiesKHR(m_surface, &details.capabilites, {});
 
@@ -396,7 +409,6 @@ SwapChainSupportDetails VulkanWindow::querySwapChainSupport(PhysicalDevice devic
     }
 
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_surface, &presentModeCount, {});
     device.getSurfacePresentModesKHR(m_surface, &presentModeCount, {}, {});
 
     if (presentModeCount != 0) {
@@ -407,10 +419,10 @@ SwapChainSupportDetails VulkanWindow::querySwapChainSupport(PhysicalDevice devic
     return details;
 }
 
-SurfaceFormatKHR VulkanWindow::chooseSwapSurfaceFormat(const std::vector<SurfaceFormatKHR>& availableFormats) {
+vk::SurfaceFormatKHR VulkanWindow::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats) {
     // Check for sRGB support
     for (const auto& availableFormat : availableFormats) {
-        if (availableFormat.format == Format::eB8G8R8Unorm && availableFormat.colorSpace == ColorSpaceKHR::eSrgbNonlinear) {
+        if (availableFormat.format == vk::Format::eB8G8R8Unorm && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
             return availableFormat;
         }
     }
@@ -418,21 +430,21 @@ SurfaceFormatKHR VulkanWindow::chooseSwapSurfaceFormat(const std::vector<Surface
     return availableFormats[0];
 }
 
-PresentModeKHR VulkanWindow::chooseSwapPresentMode(const std::vector<PresentModeKHR>& availablePresentModes) {
+vk::PresentModeKHR VulkanWindow::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes) {
     for (const auto& availablePresentMode : availablePresentModes) {
-        if (availablePresentMode == PresentModeKHR::eMailbox) {
+        if (availablePresentMode == vk::PresentModeKHR::eMailbox) {
             return availablePresentMode;
         }
     }
     
-    return PresentModeKHR::eFifo;
+    return vk::PresentModeKHR::eFifo;
 }
 
-Extent2D VulkanWindow::chooseSwapExtent(const SurfaceCapabilitiesKHR capabilites) {
+vk::Extent2D VulkanWindow::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilites) {
     if (capabilites.currentExtent.width != UINT32_MAX) {
         return capabilites.currentExtent;
     } else {
-        VkExtent2D actualExtent = {m_width, m_height};
+        vk::Extent2D actualExtent = {m_width, m_height};
 
         actualExtent.width = std::max(capabilites.minImageExtent.width, std::min(capabilites.maxImageExtent.width, actualExtent.width));
         actualExtent.height = std::max(capabilites.minImageExtent.height, std::min(capabilites.maxImageExtent.height, actualExtent.height));

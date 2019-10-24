@@ -3,7 +3,7 @@
 #include "GraphicsPipeline.hxx"
 
 // TODO: Complete these as I build the pipeline
-GraphicsPipeline::GraphicsPipeline(Device *logicalDevice, Extent2D *swapchainExtent) {
+GraphicsPipeline::GraphicsPipeline(Device *logicalDevice, Extent2D *swapchainExtent, RenderPass *renderPass) {
     m_logicalDevice = logicalDevice;
     m_swapchainExtent = swapchainExtent;
 
@@ -29,8 +29,52 @@ GraphicsPipeline::GraphicsPipeline(Device *logicalDevice, Extent2D *swapchainExt
     // Create the viewport state
     PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
 
+    // Set up the rasterizer
     PipelineRasterizationStateCreateInfo rasterizer({}, false, false, PolygonMode::eFill,
-        CullModeFlagBits::eBack, FrontFace::eClockwise, false, 0.0f, 0.0f, 0.0f);
+        CullModeFlagBits::eBack, FrontFace::eClockwise, false, 0.0f, 0.0f, 0.0f, 1.0f);
+
+    // Set up multisampling
+    PipelineMultisampleStateCreateInfo multisampling({}, SampleCountFlagBits::e1, false, 1.0f, nullptr, false, false);
+
+    //Set up the color blender
+    PipelineColorBlendAttachmentState colorBlendAttachment;
+    colorBlendAttachment.colorWriteMask = ColorComponentFlagBits::eR | ColorComponentFlagBits::eG | 
+        ColorComponentFlagBits::eB | ColorComponentFlagBits::eA;
+    colorBlendAttachment.blendEnable = true;
+    colorBlendAttachment.srcColorBlendFactor = BlendFactor::eOne;
+    colorBlendAttachment.dstColorBlendFactor = BlendFactor::eZero;
+    colorBlendAttachment.colorBlendOp = BlendOp::eAdd;
+    colorBlendAttachment.srcAlphaBlendFactor = BlendFactor::eOne;
+    colorBlendAttachment.dstAlphaBlendFactor = BlendFactor::eZero;
+    colorBlendAttachment.alphaBlendOp = BlendOp::eAdd;
+
+    //Set up blend state create info
+    PipelineColorBlendStateCreateInfo colorBlending({}, false, LogicOp::eCopy, 1, &colorBlendAttachment);
+    colorBlending.blendConstants[0] = 0.0f;
+    colorBlending.blendConstants[1] = 0.0f;
+    colorBlending.blendConstants[2] = 0.0f;
+    colorBlending.blendConstants[3] = 0.0f;
+
+    // Set up the pipeline layout
+    PipelineLayoutCreateInfo pipelineLayoutInfo; // Optional settings have been omitted
+
+    try {
+        m_logicalDevice->createPipelineLayout(&pipelineLayoutInfo, {}, &m_pipelineLayout, {});
+    } catch (std::system_error e) {
+        std::cerr << "Failed to create a pipeline layout." << std::endl;
+        throw std::runtime_error(e.what());
+    }
+
+    GraphicsPipelineCreateInfo pipelineInfo({}, 2, pipelineShaderInfo.data(), &vertexInputInfo,
+        &inputAssembly, nullptr, &viewportState, &rasterizer, &multisampling, nullptr, &colorBlending,
+        nullptr, m_pipelineLayout, *renderPass);
+
+    try {
+        m_logicalDevice->createGraphicsPipelines(nullptr, 1, &pipelineInfo, {}, &m_pipeline, {});
+    } catch (std::system_error e) {
+        std::cerr << "Failed to create a graphics pipeline." << std::endl;
+        throw std::runtime_error(e.what());
+    }
 
     // These are always at the end of this method.
     m_logicalDevice->destroyShaderModule(vertShaderModule);
@@ -38,12 +82,15 @@ GraphicsPipeline::GraphicsPipeline(Device *logicalDevice, Extent2D *swapchainExt
 };
 
 
-GraphicsPipeline::~GraphicsPipeline() = default;
+GraphicsPipeline::~GraphicsPipeline() {
+    m_logicalDevice->destroyPipeline(m_pipeline);
+    m_logicalDevice->destroyPipelineLayout(m_pipelineLayout);
+};
 
 std::vector<char> GraphicsPipeline::readFile(const path& filename) {
+    auto fullPath = current_path().append(filename.string());
 
-
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+    std::ifstream file(fullPath.string(), std::ios::ate | std::ios::binary);
 
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open file.");
@@ -65,7 +112,7 @@ ShaderModule GraphicsPipeline::createShaderModule(const std::vector<char>& code)
 
     ShaderModule shaderModule;
 
-    Result result = m_logicalDevice->createShaderModule(&createInfo, nullptr, &shaderModule);
+    m_logicalDevice->createShaderModule(&createInfo, {}, &shaderModule);
 
     return shaderModule;
 }
