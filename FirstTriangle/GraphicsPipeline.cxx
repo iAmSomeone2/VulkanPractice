@@ -3,21 +3,38 @@
 #include "GraphicsPipeline.hxx"
 
 // TODO: Complete these as I build the pipeline
-GraphicsPipeline::GraphicsPipeline(VkDevice *logicalDevice) {
+GraphicsPipeline::GraphicsPipeline(Device *logicalDevice, Extent2D *swapchainExtent) {
     m_logicalDevice = logicalDevice;
+    m_swapchainExtent = swapchainExtent;
 
     // Set up our shaders
     auto vertShaderCode = readFile(path("shaders/vert.spv"));
     auto fragShaderCode = readFile(path("shaders/frag.spv"));
 
-    VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-    VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+    ShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+    ShaderModule fragShaderModule = createShaderModule(fragShaderCode);
 
-    std::vector<VkPipelineShaderStageCreateInfo> pipelineShaderInfo = createShaderStage(vertShaderModule, fragShaderModule);
+    // Set up all of the state infos
+    auto pipelineShaderInfo = createShaderStage(vertShaderModule, fragShaderModule);
+    PipelineVertexInputStateCreateInfo vertexInputInfo({}, 0, nullptr, 0, nullptr);
+    PipelineInputAssemblyStateCreateInfo inputAssembly({}, PrimitiveTopology::eTriangleList, false);
+    Viewport viewport(0.0f, 0.0f, (float) m_swapchainExtent->width,
+        (float) m_swapchainExtent->height, 0.0f, 1.0f);
+
+    // Set up the viewport scissor
+    Rect2D scissor = {};
+    scissor.offset = Offset2D(0, 0);
+    scissor.extent = *m_swapchainExtent;
+
+    // Create the viewport state
+    PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
+
+    PipelineRasterizationStateCreateInfo rasterizer({}, false, false, PolygonMode::eFill,
+        CullModeFlagBits::eBack, FrontFace::eClockwise, false, 0.0f, 0.0f, 0.0f);
 
     // These are always at the end of this method.
-    vkDestroyShaderModule(*m_logicalDevice, fragShaderModule, nullptr);
-    vkDestroyShaderModule(*m_logicalDevice, vertShaderModule, nullptr);
+    m_logicalDevice->destroyShaderModule(vertShaderModule);
+    m_logicalDevice->destroyShaderModule(fragShaderModule);
 };
 
 
@@ -43,38 +60,42 @@ std::vector<char> GraphicsPipeline::readFile(const path& filename) {
     return buffer;
 }
 
-VkShaderModule GraphicsPipeline::createShaderModule(const std::vector<char>& code) {
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+ShaderModule GraphicsPipeline::createShaderModule(const std::vector<char>& code) {
+    ShaderModuleCreateInfo createInfo({}, code.size(), reinterpret_cast<const uint32_t*>(code.data()));
 
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(*m_logicalDevice, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create shader module.");
-    }
+    ShaderModule shaderModule;
+
+    Result result = m_logicalDevice->createShaderModule(&createInfo, nullptr, &shaderModule);
 
     return shaderModule;
 }
 
-std::vector<VkPipelineShaderStageCreateInfo> GraphicsPipeline::createShaderStage(VkShaderModule vertShaderModule, VkShaderModule fragShaderModule) {
-    std::vector<VkPipelineShaderStageCreateInfo> createInfos(2);
+std::vector<PipelineShaderStageCreateInfo> GraphicsPipeline::createShaderStage(ShaderModule vertShaderModule, ShaderModule fragShaderModule) {
+    std::vector<PipelineShaderStageCreateInfo> createInfos(2);
 
-    for (int i = 0; i < 2; i++) {
-        VkPipelineShaderStageCreateInfo shaderStageInfo = {};
-        shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        // Determine type of shader
-        if (i == 0) {
-            shaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-            shaderStageInfo.module = vertShaderModule;
-        } else {
-            shaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            shaderStageInfo.module = fragShaderModule;
-        }
+    PipelineShaderStageCreateInfo vertexShaderInfo({}, ShaderStageFlagBits::eVertex,
+        vertShaderModule, "main");
 
-        shaderStageInfo.pName = "main";
-        createInfos[i] = shaderStageInfo;
-    }
+    createInfos[0] = vertexShaderInfo;
+
+    PipelineShaderStageCreateInfo fragShaderInfo({}, ShaderStageFlagBits::eFragment,
+        fragShaderModule, "main");
+
+    createInfos[1] = fragShaderInfo;
 
     return createInfos;
+}
+
+PipelineMultisampleStateCreateInfo GraphicsPipeline::createMultiSampleStateInfo() {
+    VkPipelineMultisampleStateCreateInfo multisampling = {};
+
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.minSampleShading = 1.0f; // Optional
+    multisampling.pSampleMask = nullptr; // Optional
+    multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
+    multisampling.alphaToOneEnable = VK_FALSE; // Optional
+
+    return multisampling;
 }
