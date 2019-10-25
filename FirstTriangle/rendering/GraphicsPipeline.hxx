@@ -13,7 +13,7 @@ class GraphicsPipeline {
 public:
     GraphicsPipeline(Device *logicalDevice, Extent2D *swapchainExtent, RenderPass *renderPass);
     ~GraphicsPipeline();
-
+    Pipeline *pipeline();
 private:
     Device *m_logicalDevice;
     Extent2D *m_swapchainExtent;

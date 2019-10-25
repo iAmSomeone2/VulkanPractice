@@ -53,6 +53,8 @@ public:
     ~VulkanWindow();
 
     GLFWwindow *window();
+    vk::Device *logicalDevice();
+    void drawFrame();
 private:
     // Window
     GLFWwindow *m_window;
@@ -81,9 +83,15 @@ private:
     GraphicsPipeline *m_gPipeline;
     Render *m_render;
     std::vector<FrameBuffer*> m_frameBuffers;
+    vk::CommandPool m_commandPool;
+    std::vector<vk::CommandBuffer> m_commandBuffers;
 
     // Image views
     std::vector<vk::ImageView> m_swapChainImageViews;
+
+    // Drawing
+    vk::Semaphore m_imgAvailableSemaphore;
+    vk::Semaphore m_renderFinishedSemaphore;
 
 
     // -----Instance management methods-----
@@ -112,7 +120,22 @@ private:
 
     void createImageViews();
 
+    /**
+     * Sets up the swapchain
+     */
     void createFrameBuffers();
+
+    /**
+     * Sets up the command pool.
+     */
+    void createCommandPool();
+
+    /**
+     * Allocates and creates the vector containing the command buffers.
+     */
+    void createCommandBuffers();
+
+    void createSemaphores();
 
     /**
      * Checks if the required validation layers are present on the machine.

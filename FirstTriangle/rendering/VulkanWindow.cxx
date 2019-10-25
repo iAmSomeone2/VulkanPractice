@@ -34,6 +34,12 @@ VulkanWindow::VulkanWindow(const uint32_t width, const uint32_t height, const st
 };
 
 VulkanWindow::~VulkanWindow() {
+    m_logicalDevice.destroySemaphore(m_renderFinishedSemaphore);
+    m_logicalDevice.destroySemaphore(m_imgAvailableSemaphore);
+
+    // Destroy the command pool
+    m_logicalDevice.destroyCommandPool(m_commandPool);
+
     // Destroy the FrameBuffers
     for (auto buffer : m_frameBuffers) {
         delete buffer;
@@ -62,6 +68,39 @@ GLFWwindow *VulkanWindow::window() {
     return m_window;
 }
 
+vk::Device *VulkanWindow::logicalDevice() {
+    return &m_logicalDevice;
+}
+
+void VulkanWindow::drawFrame() {
+    // Determine which image can be drawn to.
+    uint32_t imgIndex;
+    m_logicalDevice.acquireNextImageKHR(m_swapChain, UINT64_MAX,
+         m_imgAvailableSemaphore, nullptr, &imgIndex);
+
+    // Set up the draw command buffer
+    vk::Semaphore waitSemaphores[] = {m_imgAvailableSemaphore};
+    vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+    vk::Semaphore signalSemaphores[] = {m_renderFinishedSemaphore};
+
+    vk::SubmitInfo submitInfo(1, waitSemaphores, waitStages, 1, &m_commandBuffers[imgIndex],
+        1, signalSemaphores);
+
+    // Submit draw command buffer
+    try {
+        m_graphicsQueue.submit(1, &submitInfo, nullptr);
+    } catch (const std::system_error& e) {
+        std::cerr << "Failed to submit draw command buffer." << std::endl;
+        throw std::runtime_error(e.what());
+    }
+
+    vk::SwapchainKHR swapchains[] = {m_swapChain};
+
+    vk::PresentInfoKHR presentInfo(1, signalSemaphores, 1, swapchains, &imgIndex, nullptr);
+
+    m_presentQueue.presentKHR(&presentInfo);
+}
+
 // ----- Private Methods -----
 // ----- Instance Management -----
 
@@ -84,7 +123,10 @@ void VulkanWindow::initVulkan() {
     m_render = new Render(&m_logicalDevice, m_swapChainImageFormat);
     m_gPipeline = new GraphicsPipeline(&m_logicalDevice, &m_swapChainExtent, m_render->renderPass());
     createFrameBuffers();
-git     std::cout << "I'm just curious..." << std::endl;
+    createCommandPool();
+    createCommandBuffers();
+    createSemaphores();
+    std::cout << "I'm just curious..." << std::endl;
 }
 
 // ----- Vulkan-specific methods -----
@@ -159,6 +201,83 @@ void VulkanWindow::createFrameBuffers() {
         vk::ImageView attachment = m_swapChainImageViews[i];
 
         m_frameBuffers[i] = new FrameBuffer(&m_logicalDevice, &attachment, m_swapChainExtent, m_render->renderPass());
+    }
+}
+
+void VulkanWindow::createCommandPool() {
+    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(m_device);
+
+    vk::CommandPoolCreateInfo poolInfo({}, queueFamilyIndices.graphicsFamily.value());
+
+    try {
+        m_logicalDevice.createCommandPool(&poolInfo, nullptr, &m_commandPool);
+    } catch (const std::system_error& e) {
+        std::cerr << "Failed to create command pool." << std::endl;
+        throw std::runtime_error(e.what());
+    }
+}
+
+void VulkanWindow::createCommandBuffers() {
+    m_commandBuffers.resize(m_frameBuffers.size());
+
+    vk::CommandBufferAllocateInfo allocateInfo(m_commandPool, vk::CommandBufferLevel::ePrimary,
+                                               (uint32_t)m_commandBuffers.size());
+
+    try {
+        m_logicalDevice.allocateCommandBuffers(&allocateInfo, m_commandBuffers.data());
+    } catch (const std::system_error& e) {
+        std::cerr << "Failed to allocate command buffers." << std::endl;
+        throw std::runtime_error(e.what());
+    }
+
+    // Set up command buffer recording
+    vk::ClearColorValue clearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
+    vk::ClearValue clearColor(clearColorValue);
+    for (size_t i = 0; i < m_commandBuffers.size(); i++) {
+        vk::CommandBufferBeginInfo beginInfo;
+
+        try {
+            m_commandBuffers[i].begin(&beginInfo);
+        } catch (const std::system_error& e) {
+            std::cerr << "Failed to set up command buffer " << i << std::endl;
+            throw std::runtime_error(e.what());
+        }
+
+        // Directly write our render passes here
+        vk::RenderPassBeginInfo renderPassInfo(*m_render->renderPass(), *m_frameBuffers[i]->buffer(), {}, 1, &clearColor);
+
+        renderPassInfo.renderArea.offset = vk::Offset2D(0, 0);
+        renderPassInfo.renderArea.extent = m_swapChainExtent;
+
+        m_commandBuffers[i].beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+
+        // Bind to the graphics pipeline
+        m_commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, *m_gPipeline->pipeline());
+
+        // Set up draw command
+        m_commandBuffers[i].draw(3, 1, 0, 0);
+
+        // End the render pass
+        m_commandBuffers[i].endRenderPass();
+
+        try {
+            m_commandBuffers[i].end();
+        } catch (const std::system_error& e) {
+            std::cerr << "Failed to record command buffer." << std::endl;
+            throw std::runtime_error(e.what());
+        }
+    }
+}
+
+void VulkanWindow::createSemaphores() {
+    vk::SemaphoreCreateInfo semInfo;
+
+    try {
+        m_logicalDevice.createSemaphore(&semInfo, nullptr, &m_imgAvailableSemaphore);
+        m_logicalDevice.createSemaphore(&semInfo, nullptr, &m_renderFinishedSemaphore);
+    } catch (const std::system_error& e) {
+        std::cerr << "Failed to create semaphores." << std::endl;
+        throw std::runtime_error(e.what());
     }
 }
 

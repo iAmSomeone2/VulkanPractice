@@ -87,6 +87,10 @@ GraphicsPipeline::~GraphicsPipeline() {
     m_logicalDevice->destroyPipelineLayout(m_pipelineLayout);
 };
 
+Pipeline *GraphicsPipeline::pipeline() {
+    return &m_pipeline;
+}
+
 std::vector<char> GraphicsPipeline::readFile(const path& filename) {
     auto fullPath = current_path().append(filename.string());
 

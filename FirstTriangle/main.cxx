@@ -5,6 +5,8 @@ extern "C" {
 
 #include <iostream>
 #include <stdexcept>
+#include <thread>
+#include <chrono>
 #include <cstdlib>
 
 #include <VulkanWindow.hxx>
@@ -15,6 +17,9 @@ int main() {
     try {
         while(!glfwWindowShouldClose(vkWindow->window())) {
             glfwPollEvents();
+            vkWindow->drawFrame();
+            vkWindow->logicalDevice()->waitIdle();
+            std::this_thread::sleep_for(std::chrono::milliseconds(17));
         }
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

@@ -3,9 +3,9 @@
   <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
     <generated>
       <config projectName="FirstTriangle" targetName="rendering" />
-      <config projectName="FirstTriangle" targetName="triangle" />
-      <config projectName="FirstTriangle" targetName="vertshader" />
       <config projectName="FirstTriangle" targetName="fragshader" />
+      <config projectName="FirstTriangle" targetName="vertshader" />
+      <config projectName="FirstTriangle" targetName="triangle" />
       <config projectName="FirstTriangle" targetName="test" />
       <config projectName="FirstTriangle" targetName="shaders" />
     </generated>
@@ -17,17 +17,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="63608cac-3b42-4c2a-a47a-22e6f7f87371" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/FirstTriangle.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dictionaries/bdavidson.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GraphicsPipeline.cxx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/GraphicsPipeline.hxx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/VulkanWindow.cxx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/VulkanWindow.hxx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.cxx" beforeDir="false" afterPath="$PROJECT_DIR$/main.cxx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rendering/VulkanWindow.cxx" beforeDir="false" afterPath="$PROJECT_DIR$/rendering/VulkanWindow.cxx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rendering/VulkanWindow.hxx" beforeDir="false" afterPath="$PROJECT_DIR$/rendering/VulkanWindow.hxx" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -110,7 +102,9 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1571897958432</updated>
-      <workItem from="1571897960094" duration="1310000" />
+      <workItem from="1571897960094" duration="5361000" />
+      <workItem from="1571950993029" duration="186000" />
+      <workItem from="1571951201295" duration="341000" />
     </task>
     <servers />
   </component>
@@ -119,10 +113,23 @@
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="COLUMN_ORDER" />
+            </State>
           </value>
         </entry>
       </map>
     </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/rendering/VulkanWindow.cxx</url>
+          <line>91</line>
+          <option name="timeStamp" value="6" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>
